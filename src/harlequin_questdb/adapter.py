@@ -471,16 +471,18 @@ class HarlequinQuestDbAdapter(HarlequinAdapter):
         host: str | None = None,
         port: str | int | None = None,
         user: str | None = None,
+        username: str | None = None,
         password: str | None = None,
         dbname: str | None = None,
         connect_timeout: str | int | float | None = None,
         sslmode: str | None = None,
         **_ignored: Any,
     ) -> None:
+        effective_user = user if user is not None else username
         pool_kwargs: dict[str, Any] = {
             **({"host": host} if host is not None else {}),
             **({"port": str(port)} if port is not None else {}),
-            **({"user": user} if user is not None else {}),
+            **({"user": effective_user} if effective_user is not None else {}),
             **({"password": password} if password is not None else {}),
             **({"dbname": dbname} if dbname is not None else {}),
             **(
@@ -493,6 +495,7 @@ class HarlequinQuestDbAdapter(HarlequinAdapter):
         pool_kwargs.setdefault("host", "127.0.0.1")
         pool_kwargs.setdefault("port", "8812")
         pool_kwargs.setdefault("user", "admin")
+        pool_kwargs.setdefault("password", "quest")
         pool_kwargs.setdefault("dbname", "qdb")
         pool_kwargs.setdefault("sslmode", "disable")
         # Reduce idle TCP teardown on long-running Harlequin sessions (NAT / PGWire).

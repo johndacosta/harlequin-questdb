@@ -1,11 +1,12 @@
 [project]
 
 name = "harlequin-questdb"
-version = "0.1.0"
+version = "0.4.0-rc1"
 requires-python = ">=3.10"
 description = "Harlequin adapter for QuestDB over PGWire"
 authors = [
-    { name = "John DaCosta", email = "john.dacosta@gmail.com" }
+    { name = "Rik Huygen" },
+    { name = "John DaCosta", email = "john.dacosta@gmail.com" },
 ]
 license = "MIT"
 readme = "README.md"
@@ -26,7 +27,13 @@ dependencies = [
 
 [project.entry-points."harlequin.adapter"]
 
-questdb = "harlequin_questdb.adapter:HarlequinQuestDbAdapter"
+questdb = "harlequin_questdb:QuestDBAdapter"
+
+
+[dependency-groups]
+dev = [
+    "pytest>=9,<10",
+]
 
 
 [project.urls]

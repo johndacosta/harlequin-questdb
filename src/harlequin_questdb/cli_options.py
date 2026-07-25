@@ -16,7 +16,7 @@ port = TextOption(
 )
 user = TextOption(
     name="user",
-    short_decls=["-U"],
+    short_decls=["-U", "-u"],
     default="admin",
     description=(
         "User name configured in pg.user/pg.readonly.user in QuestDB "
