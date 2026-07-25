@@ -2,6 +2,8 @@
 
 Harlequin adapter for [QuestDB](https://questdb.io/) over **PGWire** (PostgreSQL wire protocol). Connect on port **8812** to the pinned image **`questdb/questdb:8.2.2`**.
 
+> **Consolidation in progress:** parallel development with [`rhuygen/harlequin-questdb`](https://github.com/rhuygen/harlequin-questdb) is being unified — see [merge proposal](docs/MERGE_PROPOSAL.md) and [coordination issue #3](https://github.com/rhuygen/harlequin-questdb/issues/3).
+
 ## Install
 
 ```bash
