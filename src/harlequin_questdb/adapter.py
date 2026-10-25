@@ -205,6 +205,11 @@ class HarlequinQuestDbConnection(HarlequinConnection):
             )
             self._main_conn = self.pool.getconn()
         except Exception as e:
+            if hasattr(self, "pool") and self.pool is not None:
+                try:
+                    self.pool.close()
+                except Exception:
+                    pass
             raise HarlequinConnectionError(
                 msg=str(e), title="Harlequin could not connect to QuestDB."
             ) from e
@@ -220,18 +225,20 @@ class HarlequinQuestDbConnection(HarlequinConnection):
         """
         old = self._main_conn
         try:
+            old.close()
+        except Exception:
+            pass
+        try:
             self.pool.putconn(old)
         except Exception as exc:
             logger.debug("Could not putconn main QuestDB handle: %s", exc)
-            try:
-                old.close()
-            except Exception:
-                pass
         self._main_conn = self.pool.getconn()
+        self._main_conn.autocommit = True
 
     def _borrow_worker(self) -> Connection[Any]:
         cn = self.pool.getconn()
-        cn.autocommit = True
+        if not getattr(cn, "autocommit", False):
+            cn.autocommit = True
         return cn
 
     def execute(self, query: str) -> HarlequinCursor | None:
@@ -318,11 +325,20 @@ class HarlequinQuestDbConnection(HarlequinConnection):
         return sorted(completions)
 
     def close(self) -> None:
-        self.pool.putconn(self._main_conn)
-        self.pool.close()
+        try:
+            if hasattr(self, "_main_conn") and self._main_conn is not None:
+                self.pool.putconn(self._main_conn)
+        except Exception:
+            pass
+        finally:
+            if hasattr(self, "pool") and self.pool is not None:
+                self.pool.close()
 
-    def _logical_database_label(self) -> str:
-        worker = self._borrow_worker()
+    def _logical_database_label(self, worker: Connection[Any] | None = None) -> str:
+        borrowed = False
+        if worker is None:
+            worker = self._borrow_worker()
+            borrowed = True
         try:
             with worker.cursor() as cur:
                 cur.execute("select current_database();")
@@ -332,11 +348,15 @@ class HarlequinQuestDbConnection(HarlequinConnection):
         except Exception:
             pass
         finally:
-            self.pool.putconn(worker)
+            if borrowed:
+                self.pool.putconn(worker)
         return self._logical_database
 
-    def _list_schemas(self) -> list[str]:
-        worker = self._borrow_worker()
+    def _list_schemas(self, worker: Connection[Any] | None = None) -> list[str]:
+        borrowed = False
+        if worker is None:
+            worker = self._borrow_worker()
+            borrowed = True
         try:
             with worker.cursor() as cur:
                 cur.execute("select current_schema();")
@@ -346,18 +366,25 @@ class HarlequinQuestDbConnection(HarlequinConnection):
         except Exception:
             pass
         finally:
-            self.pool.putconn(worker)
+            if borrowed:
+                self.pool.putconn(worker)
         return ["public"]
 
     def _list_relations(
         self,
+        worker: Connection[Any] | None = None,
     ) -> list[tuple[str, str, str | None, str | None]]:
-        worker = self._borrow_worker()
+        borrowed = False
+        if worker is None:
+            worker = self._borrow_worker()
+            borrowed = True
         try:
             with worker.cursor() as cur:
                 try:
                     cur.execute(self._quest_kind_sql)
-                except Exception:
+                except Exception as exc:
+                    if _recoverable_connection_error(exc):
+                        raise
                     self._quest_kind_sql = self._QUEST_KIND_SQL_LEGACY
                     cur.execute(self._quest_kind_sql)
                 return [
@@ -370,7 +397,8 @@ class HarlequinQuestDbConnection(HarlequinConnection):
                     for r in cur.fetchall()
                 ]
         finally:
-            self.pool.putconn(worker)
+            if borrowed:
+                self.pool.putconn(worker)
 
     def _get_relation_columns(self, relation: str) -> list[tuple[str, str, bool]]:
         lit = _escape_quest_literal(relation)
@@ -386,7 +414,9 @@ class HarlequinQuestDbConnection(HarlequinConnection):
                             order by "column" asc
                             ;"""
                         )
-                    except Exception:
+                    except Exception as exc:
+                        if _recoverable_connection_error(exc):
+                            raise
                         self._relation_columns_include_designated = False
                         cur.execute(
                             f"""
@@ -479,7 +509,13 @@ class HarlequinQuestDbAdapter(HarlequinAdapter):
         **_ignored: Any,
     ) -> None:
         effective_user = user if user is not None else username
-        pool_kwargs: dict[str, Any] = {
+        parsed_conn: dict[str, Any] = {}
+        if len(conn_str) == 1 and conn_str[0].strip():
+            try:
+                parsed_conn = conninfo.conninfo_to_dict(conn_str[0])
+            except Exception:
+                parsed_conn = {}
+        cli_overrides: dict[str, Any] = {
             **({"host": host} if host is not None else {}),
             **({"port": str(port)} if port is not None else {}),
             **({"user": effective_user} if effective_user is not None else {}),
@@ -492,10 +528,10 @@ class HarlequinQuestDbAdapter(HarlequinAdapter):
             ),
             **({"sslmode": sslmode} if sslmode is not None else {}),
         }
+        pool_kwargs: dict[str, Any] = {**parsed_conn, **cli_overrides}
         pool_kwargs.setdefault("host", "127.0.0.1")
         pool_kwargs.setdefault("port", "8812")
         pool_kwargs.setdefault("user", "admin")
-        pool_kwargs.setdefault("password", "quest")
         pool_kwargs.setdefault("dbname", "qdb")
         pool_kwargs.setdefault("sslmode", "disable")
         # Reduce idle TCP teardown on long-running Harlequin sessions (NAT / PGWire).

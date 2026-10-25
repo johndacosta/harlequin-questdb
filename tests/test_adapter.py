@@ -7,9 +7,6 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from harlequin.adapter import HarlequinAdapter, HarlequinConnection
-from harlequin.catalog import Catalog
-from harlequin_questdb import QuestDBAdapter, QuestDBAdapter_OPTIONS
 from harlequin_questdb.adapter import (
     HarlequinQuestDbAdapter,
     HarlequinQuestDbConnection,
@@ -21,6 +18,10 @@ from harlequin_questdb.catalog import (
     MaterializedViewCatalogItem,
     TableCatalogItem,
 )
+
+from harlequin.adapter import HarlequinAdapter, HarlequinConnection
+from harlequin.catalog import Catalog
+from harlequin_questdb import QuestDBAdapter, QuestDBAdapter_OPTIONS
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
@@ -90,9 +91,9 @@ def test_username_kwarg_compat() -> None:
     assert adapter.pool_kwargs["user"] == "legacy_user"
 
 
-def test_default_password_matches_0_3_x() -> None:
+def test_no_auto_supplied_default_password() -> None:
     adapter = HarlequinQuestDbAdapter(conn_str=tuple())
-    assert adapter.pool_kwargs["password"] == "quest"
+    assert "password" not in adapter.pool_kwargs
 
 
 def test_contract_implements_cancel() -> None:
