@@ -1,4 +1,18 @@
-# harlequin-questdb
+# ⚠️ DEPRECATED — Merged into Upstream
+
+> **IMPORTANT**: This independent repository is **deprecated** and merged into the canonical upstream repository:  
+> 👉 **[rhuygen/harlequin-questdb](https://github.com/rhuygen/harlequin-questdb)**
+>
+> All ongoing development, releases, and maintenance take place upstream.
+>
+> **Install the official release from PyPI:**
+> ```bash
+> pip install harlequin-questdb
+> ```
+
+---
+
+# harlequin-questdb (Archived)
 
 Harlequin adapter for [QuestDB](https://questdb.io/) over **PGWire** (PostgreSQL wire protocol). Connect on port **8812** to the pinned image **`questdb/questdb:8.2.2`**.
 
